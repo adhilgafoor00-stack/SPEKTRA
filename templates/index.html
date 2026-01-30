@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>SPEKTRA AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/styles.css"/>
+</head>
+<body>
+  <div class="scanlines"></div>
+  <div class="grain"></div>
+  <div class="hud-grid"></div>
+
+  <main class="layout">
+    <section class="stage-card">
+      <canvas id="scene"></canvas>
+      <div class="holo-label">S.P.E.K.T.R.A</div>
+      <div class="widgets">
+        <div class="widget" id="clock">
+          <div class="w-title">CLOCK</div>
+          <div class="w-body"><span id="clk">--:--:--</span></div>
+        </div>
+        <div class="widget" id="system">
+          <div class="w-title">SYSTEM</div>
+          <div class="w-body">
+            CPU: <span id="cpu">n/a</span><br/>
+            MEM: <span id="mem">n/a</span><br/>
+            PROCS: <span id="procs">n/a</span>
+          </div>
+        </div>
+        <div class="widget" id="network">
+          <div class="w-title">NETWORK</div>
+          <div class="w-body">
+            Online: <span id="online">n/a</span><br/>
+            Latency: <span id="latency">n/a</span><br/>
+            IP: <span id="ip">n/a</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="console-card">
+      <div class="console-header">
+        <span class="dot"></span>
+        <span class="title">Console</span>
+      </div>
+      <div id="output" class="output"></div>
+      <form id="form" class="input-row">
+        <input id="cmd" class="cmd" placeholder="type a command, e.g., help" autocomplete="off"/>
+        <button class="send" type="submit">RUN</button>
+      </form>
+      <div class="hints">
+        <b>tips:</b> help · ask what is ai · teach python: a language · genproj flask-app myapp
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="/static/js/app.js" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+{
+  "notes": [],
+  "log": [
+    {
+      "user": "ask: what is ai",
+      "assistant": "(base) Recap for 'what is ai': what is ai",
+      "ts": 1755077741.9873414
+    },
+    {
+      "user": "ask: what is recursion",
+      "assistant": "(base) Recap for 'what is recursion': what is recursion",
+      "ts": 1755077794.443297
+    },
+    {
+      "user": "teach: python",
+      "assistant": "a language focused on readability",
+      "ts": 1755077829.2296112
+    },
+    {
+      "user": "ask: what is ai",
+      "assistant": "(base) Recap for 'what is ai': what is ai",
+      "ts": 1755097913.253665
+    },
+    {
+      "user": "ask: what is ai",
+      "assistant": "(base) Recap for 'what is ai': what is ai",
+      "ts": 1756060333.646251
+    },
+    {
+      "user": "ask: what is ai",
+      "assistant": "(base) Recap for 'what is ai': what is ai",
+      "ts": 1760689277.3506317
+    },
+    {
+      "user": "ask: (dubai)",
+      "assistant": "Dubai is the most populous city in the United Arab Emirates and the capital of the Emirate of Dubai. It is on a creek on the southeastern coast of the Persian Gulf.",
+      "ts": 1763483283.1394134
+    },
+    {
+      "user": "ask: (what is ai)",
+      "assistant": "Artificial intelligence (AI) is the capability of computational systems to perform tasks typically associated with human intelligence, such as learning, reasoning, problem-solving, perception, and decision-making. It is a field of research in computer science that develops and studies methods and software that enable machines to perceive their environment and use learning and intelligence to take actions that maximize their chances of achieving defined goals.",
+      "ts": 1763899047.3853693
+    },
+    {
+      "user": "ask: (what is ai)",
+      "assistant": "Artificial intelligence (AI) is the capability of computational systems to perform tasks typically associated with human intelligence, such as learning, reasoning, problem-solving, perception, and decision-making. It is a field of research in computer science that develops and studies methods and software that enable machines to perceive their environment and use learning and intelligence to take actions that maximize their chances of achieving defined goals.",
+      "ts": 1768650426.1006365
+    },
+    {
+      "user": "ask: (what is phone)",
+      "assistant": "A mobile phone or cell phone is a portable wireless  telephone that allows users to make and receive calls over a radio frequency link while moving within a designated telephone service area, unlike fixed-location phones (landline phones). This radio frequency link connects to the switching systems of a mobile phone operator, providing access to the public switched telephone network (PSTN).",
+      "ts": 1768668826.379232
+    },
+    {
+      "user": "ask: (what are you)",
+      "assistant": "What Keeps You Alive is a 2018 Canadian psychological horror film written and directed by Colin Minihan. It stars Hannah Emily Anderson and Brittany Allen and follows a young woman fighting for her life as her wife's murderous intentions become evident.",
+      "ts": 1768671040.1983411
+    },
+    {
+      "user": "ask: (where is thaj mahal)",
+      "assistant": "(base) Recap for '(where is thaj mahal)': (where is thaj mahal)",
+      "ts": 1768671329.5770345
+    },
+    {
+      "user": "ask: (thaj mahal)",
+      "assistant": "(base) Recap for '(thaj mahal)': (thaj mahal)",
+      "ts": 1768671358.2616646
+    },
+    {
+      "user": "teach: hello",
+      "assistant": "Hello.. How can i help you",
+      "ts": 1768671564.264464
+    },
+    {
+      "user": "ask: (hello)",
+      "assistant": "(learned) hello: Hello.. How can i help you",
+      "ts": 1768671582.9941816
+    },
+    {
+      "user": "ask: (hello\\)",
+      "assistant": "(learned) hello: Hello.. How can i help you",
+      "ts": 1768678584.7306054
+    }
+  ]
+}

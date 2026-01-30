@@ -1,0 +1,16 @@
+{
+  "facts": {
+    "python": [
+      {
+        "fact": "a language focused on readability",
+        "ts": 1755077829.22847
+      }
+    ],
+    "hello": [
+      {
+        "fact": "Hello.. How can i help you",
+        "ts": 1768671564.2619429
+      }
+    ]
+  }
+}
