@@ -1,6 +1,8 @@
-# SPEKTRA v2 (No Voice) — Widgets + Learning + Programming
+# SPEKTRA Smart Programmable Engine for knowledge, Technology & Responsive Automation 
+ is a modular intelligent assistant system developed using Python and web technologies. The project focuses on creating a customizable, extensible, and locally executable assistant capable of processing user commands, managing memory, learning from interactions, and executing tools dynamically. The system follows a modular architecture that improves scalability, maintainability, and future extensibility. This project serves as a strong foundation for advanced AI-based assistant systems.
+ (No Voice) — Widgets + Learning + Programming
 
-New in v2:
+New in v1:
 - HUD widgets: **clock**, **system stats**, **network status** (auto-refresh).
 - Self-learning: `teach <topic>: <fact>` and `facts` + retrieval used by `ask`.
 - Programming helper: `genproj <template> <dir>` (templates: `python-cli`, `flask-app`, `tkinter-app`).
