@@ -103,9 +103,11 @@ class Assistant:
     MAX_HISTORY = 20  # messages kept in the live conversation
 
     NO_LLM_MESSAGE = (
-        "I can chat once a model is connected. Two options:\n"
-        "1) Claude: set ANTHROPIC_API_KEY (get one at console.anthropic.com), then restart.\n"
-        "2) Local: install Ollama, run `ollama pull llama3.2`, set SPEKTRA_LLM=ollama.\n"
+        "I can chat once a model is connected. Free options:\n"
+        "1) Groq: get a free key at console.groq.com, then set GROQ_API_KEY.\n"
+        "2) Gemini: free key from Google AI Studio, then set GEMINI_API_KEY.\n"
+        "3) Local: install Ollama, run `ollama pull llama3.2`, set SPEKTRA_LLM=ollama.\n"
+        "(Paid: ANTHROPIC_API_KEY or OPENAI_API_KEY.) Restart after setting a key.\n"
         "Until then I still do commands. Type 'help'."
     )
 

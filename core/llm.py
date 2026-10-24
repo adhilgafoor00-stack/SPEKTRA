@@ -1,17 +1,21 @@
-"""Pluggable LLM backend for `ask`.
+"""Pluggable LLM backend for chat and `ask`.
 
-Backends (chosen with SPEKTRA_LLM, default "auto"):
-  anthropic  - Claude via the Messages API   (needs ANTHROPIC_API_KEY)
-  ollama     - local model via Ollama        (needs `ollama serve`, offline-friendly)
-  none       - disabled, SPEKTRA falls back to facts + Wikipedia
+Backends (SPEKTRA_LLM, default "auto"):
+  groq        - free tier, no card needed        GROQ_API_KEY
+  gemini      - Google AI Studio free tier       GEMINI_API_KEY
+  openrouter  - has ":free" models               OPENROUTER_API_KEY
+  openai      - OpenAI (paid credits needed)     OPENAI_API_KEY
+  custom      - any OpenAI-compatible server     SPEKTRA_OPENAI_BASE_URL + SPEKTRA_OPENAI_API_KEY
+  anthropic   - Claude (paid)                    ANTHROPIC_API_KEY
+  ollama      - local model, free and offline    needs `ollama serve`
+  none        - disabled
 
-"auto" picks anthropic if a key is set, else ollama if it is reachable, else none.
+"auto" uses the first one whose key is set (order above is the order tried:
+anthropic, groq, gemini, openrouter, openai, custom), else Ollama if running, else none.
 
-Env vars:
-  SPEKTRA_LLM            auto | anthropic | ollama | none
-  SPEKTRA_LLM_MODEL      model name override
-  ANTHROPIC_API_KEY      key for the anthropic backend
-  OLLAMA_HOST            default http://127.0.0.1:11434
+Other env vars:
+  SPEKTRA_LLM_MODEL   model name override (every provider has a sensible default)
+  OLLAMA_HOST         default http://127.0.0.1:11434
 """
 import os
 from typing import List, Optional
@@ -21,6 +25,19 @@ import requests
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5-5"  # use claude-haiku-5-5 for cheaper/faster
 DEFAULT_OLLAMA_MODEL = "llama3.2"
+
+# OpenAI-compatible providers: name -> (base url, key env var, default model).
+# Free-tier model names change often; override with SPEKTRA_LLM_MODEL if one is retired.
+OPENAI_COMPAT = {
+    "groq": ("https://api.groq.com/openai/v1", "GROQ_API_KEY", "llama-3.3-70b-versatile"),
+    "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai", "GEMINI_API_KEY",
+               "gemini-flash-latest"),
+    "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY",
+                   "meta-llama/llama-3.3-70b-instruct:free"),
+    "openai": ("https://api.openai.com/v1", "OPENAI_API_KEY", "gpt-4o-mini"),
+    "custom": (None, "SPEKTRA_OPENAI_API_KEY", "gpt-4o-mini"),
+}
+AUTO_ORDER = ["groq", "gemini", "openrouter", "openai", "custom"]
 TIMEOUT = 30
 
 SYSTEM_PROMPT = (
@@ -63,12 +80,27 @@ def _ollama_up() -> bool:
         return False
 
 
+def _compat_config(name: str):
+    base, key_env, model = OPENAI_COMPAT[name]
+    if name == "custom":
+        base = os.environ.get("SPEKTRA_OPENAI_BASE_URL")
+    return base, os.environ.get(key_env), model
+
+
+def _compat_ready(name: str) -> bool:
+    base, key, _ = _compat_config(name)
+    return bool(base and key)
+
+
 def pick_backend() -> str:
     choice = os.environ.get("SPEKTRA_LLM", "auto").lower()
-    if choice in ("anthropic", "ollama", "none"):
+    if choice in ("anthropic", "ollama", "none") or choice in OPENAI_COMPAT:
         return choice
     if os.environ.get("ANTHROPIC_API_KEY"):
         return "anthropic"
+    for name in AUTO_ORDER:
+        if _compat_ready(name):
+            return name
     if _ollama_up():
         return "ollama"
     return "none"
@@ -135,11 +167,47 @@ def _ollama(messages: List[dict], system: str, max_tokens: int) -> str:
     return text
 
 
+def _openai_compat(name: str):
+    def call(messages: List[dict], system: str, max_tokens: int) -> str:
+        base, key, default_model = _compat_config(name)
+        if not base or not key:
+            raise LLMError(f"{name}: missing base URL or API key")
+        r = requests.post(
+            base.rstrip("/") + "/chat/completions",
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            json={
+                "model": os.environ.get("SPEKTRA_LLM_MODEL", default_model),
+                "max_tokens": max_tokens,
+                "messages": [{"role": "system", "content": system}] + messages,
+            },
+            timeout=TIMEOUT * 2,
+        )
+        if r.status_code in (401, 403):
+            raise LLMError(f"{name}: API key rejected ({r.status_code}). Check the key.")
+        if r.status_code == 404:
+            raise LLMError(f"{name}: model not found. Set SPEKTRA_LLM_MODEL to a current model name.")
+        if r.status_code == 429:
+            raise LLMError(f"{name}: free-tier rate limit hit (429). Wait a bit and try again.")
+        if not r.ok:
+            raise LLMError(f"{name} HTTP {r.status_code}")
+        choices = r.json().get("choices") or []
+        text = ((choices[0].get("message") or {}).get("content") or "").strip() if choices else ""
+        if not text:
+            raise LLMError("empty response")
+        return text
+    return call
+
+
 def _complete(messages: List[dict], system: str, max_tokens: int) -> str:
     backend = pick_backend()
     if backend == "none":
         raise LLMError("no LLM configured")
-    fn = _anthropic if backend == "anthropic" else _ollama
+    if backend == "anthropic":
+        fn = _anthropic
+    elif backend == "ollama":
+        fn = _ollama
+    else:
+        fn = _openai_compat(backend)
     return fn(messages, system, max_tokens)
 
 
@@ -174,6 +242,12 @@ def chat(messages: List[dict], facts: Optional[List[str]] = None) -> str:
 def status() -> str:
     backend = pick_backend()
     if backend == "none":
-        return "llm: off (set ANTHROPIC_API_KEY or run Ollama to enable)"
-    default = DEFAULT_ANTHROPIC_MODEL if backend == "anthropic" else DEFAULT_OLLAMA_MODEL
+        return ("llm: off. Free options: set GROQ_API_KEY or GEMINI_API_KEY, "
+                "or run Ollama. See README.")
+    if backend == "anthropic":
+        default = DEFAULT_ANTHROPIC_MODEL
+    elif backend == "ollama":
+        default = DEFAULT_OLLAMA_MODEL
+    else:
+        default = OPENAI_COMPAT[backend][2]
     return f"llm: {backend} ({os.environ.get('SPEKTRA_LLM_MODEL', default)})"

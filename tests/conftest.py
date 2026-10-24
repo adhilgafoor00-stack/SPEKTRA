@@ -12,7 +12,10 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.setenv("SPEKTRA_WORKSPACE", str(tmp_path / "workspace"))
     monkeypatch.setenv("SPEKTRA_LLM", "none")
     monkeypatch.setenv("SPEKTRA_HW", "sim")
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    for var in ("ANTHROPIC_API_KEY", "GROQ_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY",
+                "OPENAI_API_KEY", "SPEKTRA_OPENAI_API_KEY", "SPEKTRA_OPENAI_BASE_URL",
+                "SPEKTRA_LLM_MODEL"):
+        monkeypatch.delenv(var, raising=False)
     from core import hardware
     hardware.reset_device()
     yield

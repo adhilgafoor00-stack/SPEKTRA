@@ -48,23 +48,27 @@ ls [path]  /  cat <path>          browse workspace/ only
 hw status | hw read temp|hum|light | hw led on|off | hw reconnect
 ```
 
-## Turning on the LLM
+## Turning on the LLM (free options included)
 
-SPEKTRA picks a backend automatically (`SPEKTRA_LLM=auto`):
+SPEKTRA picks a backend automatically from whichever key you set (`SPEKTRA_LLM=auto`). Pick one:
+
+| Option | Cost | Setup |
+|---|---|---|
+| **Groq** | free tier, no card | key at console.groq.com, then `export GROQ_API_KEY=...` |
+| **Gemini** | free tier, no card (small daily limits; Google may use free-tier prompts to improve products) | key from Google AI Studio, then `export GEMINI_API_KEY=...` |
+| **OpenRouter** | has free `:free` models | `export OPENROUTER_API_KEY=...` |
+| **Ollama** | free, offline, runs on your PC | `ollama pull llama3.2 && ollama serve`, then `export SPEKTRA_LLM=ollama` |
+| **Claude / OpenAI** | paid | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` |
+| **Any OpenAI-compatible server** (LM Studio, vLLM...) | depends | `SPEKTRA_LLM=custom`, `SPEKTRA_OPENAI_BASE_URL`, `SPEKTRA_OPENAI_API_KEY` |
 
 ```bash
-# Option A: Claude API
-export ANTHROPIC_API_KEY=sk-ant-...
-export SPEKTRA_LLM_MODEL=claude-haiku-5-5     # optional: cheaper/faster (default is claude-sonnet-5-5)
-
-# Option B: fully local/offline
-ollama pull llama3.2 && ollama serve
-export SPEKTRA_LLM=ollama
+export GROQ_API_KEY=gsk_...
+python app.py          # then type `llm` to confirm, and say hi
 ```
 
-Get a key at console.anthropic.com (API usage is billed separately from a Claude subscription). Run `llm` in the console to see what is active.
+Free-tier model names and limits change; if you get "model not found", set `SPEKTRA_LLM_MODEL` to a current name from the provider's docs. Keep keys out of git (use env vars or a local `.env`, which is already git-ignored).
 
-The chat personality lives in `CHAT_SYSTEM_PROMPT` in `core/llm.py`; edit it to change how SPEKTRA talks. Set `SPEKTRA_LLM=none` to disable.
+The chat personality lives in `CHAT_SYSTEM_PROMPT` in `core/llm.py`; edit it to change how SPEKTRA talks.
 
 ## Using real hardware
 

@@ -59,7 +59,7 @@ def test_failed_call_does_not_corrupt_history(assistant, monkeypatch):
 
 def test_no_backend_gives_setup_help(assistant):
     out = assistant.handle("how are you?")
-    assert "ANTHROPIC_API_KEY" in out and "Ollama" in out
+    assert "GROQ_API_KEY" in out and "GEMINI_API_KEY" in out and "Ollama" in out
 
 
 def test_taught_facts_are_passed_as_context(assistant, monkeypatch):
@@ -118,3 +118,78 @@ def test_anthropic_request_shape(monkeypatch):
     assert seen["body"]["model"] == "claude-sonnet-5-5"
     assert "SPEKTRA" in seen["body"]["system"] and "esp32: my board" in seen["body"]["system"]
     assert seen["body"]["messages"] == [{"role": "user", "content": "hi"}]
+
+
+def test_auto_picks_free_provider_from_key(monkeypatch):
+    monkeypatch.setenv("SPEKTRA_LLM", "auto")
+    monkeypatch.setattr(llm, "_ollama_up", lambda: False)
+    monkeypatch.setenv("GEMINI_API_KEY", "g-key")
+    assert llm.pick_backend() == "gemini"
+    monkeypatch.setenv("GROQ_API_KEY", "gq-key")
+    assert llm.pick_backend() == "groq"
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant")
+    assert llm.pick_backend() == "anthropic"
+
+
+def test_custom_needs_base_url_and_key(monkeypatch):
+    monkeypatch.setenv("SPEKTRA_LLM", "auto")
+    monkeypatch.setattr(llm, "_ollama_up", lambda: False)
+    monkeypatch.setenv("SPEKTRA_OPENAI_API_KEY", "k")
+    assert llm.pick_backend() == "none"
+    monkeypatch.setenv("SPEKTRA_OPENAI_BASE_URL", "http://localhost:1234/v1")
+    assert llm.pick_backend() == "custom"
+
+
+def _fake_post(monkeypatch, status=200, body=None):
+    seen = {}
+
+    class R:
+        status_code = status
+        ok = status < 400
+
+        def json(self):
+            return body or {"choices": [{"message": {"content": "hi from groq"}}]}
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        seen.update(url=url, headers=headers, body=json)
+        return R()
+
+    monkeypatch.setattr(llm.requests, "post", fake_post)
+    return seen
+
+
+def test_groq_request_shape(monkeypatch):
+    monkeypatch.setenv("SPEKTRA_LLM", "groq")
+    monkeypatch.setenv("GROQ_API_KEY", "gq-key")
+    seen = _fake_post(monkeypatch)
+    out = llm.chat([{"role": "user", "content": "yo"}], facts=["a: b"])
+    assert out == "hi from groq"
+    assert seen["url"] == "https://api.groq.com/openai/v1/chat/completions"
+    assert seen["headers"]["Authorization"] == "Bearer gq-key"
+    msgs = seen["body"]["messages"]
+    assert msgs[0]["role"] == "system" and "a: b" in msgs[0]["content"]
+    assert msgs[1] == {"role": "user", "content": "yo"}
+    assert seen["body"]["model"] == "llama-3.3-70b-versatile"
+
+
+def test_model_override_and_gemini_url(monkeypatch):
+    monkeypatch.setenv("SPEKTRA_LLM", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "g")
+    monkeypatch.setenv("SPEKTRA_LLM_MODEL", "my-model")
+    seen = _fake_post(monkeypatch)
+    llm.chat([{"role": "user", "content": "yo"}])
+    assert seen["url"].startswith("https://generativelanguage.googleapis.com/v1beta/openai/")
+    assert seen["body"]["model"] == "my-model"
+
+
+def test_free_tier_errors_are_friendly(monkeypatch):
+    monkeypatch.setenv("SPEKTRA_LLM", "groq")
+    monkeypatch.setenv("GROQ_API_KEY", "gq-key")
+    for status, word in ((429, "rate limit"), (401, "rejected"), (404, "model not found")):
+        _fake_post(monkeypatch, status=status)
+        try:
+            llm.chat([{"role": "user", "content": "yo"}])
+        except llm.LLMError as e:
+            assert word in str(e)
+        else:
+            raise AssertionError("expected LLMError")
