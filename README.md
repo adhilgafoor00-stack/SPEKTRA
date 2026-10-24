@@ -61,10 +61,14 @@ SPEKTRA picks a backend automatically from whichever key you set (`SPEKTRA_LLM=a
 | **Claude / OpenAI** | paid | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` |
 | **Any OpenAI-compatible server** (LM Studio, vLLM...) | depends | `SPEKTRA_LLM=custom`, `SPEKTRA_OPENAI_BASE_URL`, `SPEKTRA_OPENAI_API_KEY` |
 
+Easiest (works the same on Windows, Mac and Linux): copy `.env.example` to `.env`, paste your key after `GROQ_API_KEY=` (no quotes, no spaces), then run `python app.py` and type `llm` to confirm.
+
 ```bash
-export GROQ_API_KEY=gsk_...
-python app.py          # then type `llm` to confirm, and say hi
+cp .env.example .env     # Windows: copy .env.example .env
+python app.py
 ```
+
+`.env` is git-ignored. Never paste a real key into `docker-compose.yml`, the README or any tracked file; if a key leaks, revoke it in the provider's console and make a new one.
 
 Free-tier model names and limits change; if you get "model not found", set `SPEKTRA_LLM_MODEL` to a current name from the provider's docs. Keep keys out of git (use env vars or a local `.env`, which is already git-ignored).
 

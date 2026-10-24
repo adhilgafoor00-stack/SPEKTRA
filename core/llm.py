@@ -69,6 +69,17 @@ class LLMError(RuntimeError):
     pass
 
 
+def _env(name: str) -> str:
+    """Env var with the usual copy/paste damage removed: surrounding spaces, newlines,
+    quotes (Windows `set KEY="..."` keeps them) and an accidental 'Bearer ' prefix."""
+    v = (os.environ.get(name) or "").strip()
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+        v = v[1:-1].strip()
+    if v.lower().startswith("bearer "):
+        v = v[7:].strip()
+    return v
+
+
 def _ollama_host() -> str:
     return os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
 
@@ -83,8 +94,8 @@ def _ollama_up() -> bool:
 def _compat_config(name: str):
     base, key_env, model = OPENAI_COMPAT[name]
     if name == "custom":
-        base = os.environ.get("SPEKTRA_OPENAI_BASE_URL")
-    return base, os.environ.get(key_env), model
+        base = _env("SPEKTRA_OPENAI_BASE_URL")
+    return base, _env(key_env), model
 
 
 def _compat_ready(name: str) -> bool:
@@ -96,7 +107,7 @@ def pick_backend() -> str:
     choice = os.environ.get("SPEKTRA_LLM", "auto").lower()
     if choice in ("anthropic", "ollama", "none") or choice in OPENAI_COMPAT:
         return choice
-    if os.environ.get("ANTHROPIC_API_KEY"):
+    if _env("ANTHROPIC_API_KEY"):
         return "anthropic"
     for name in AUTO_ORDER:
         if _compat_ready(name):
@@ -117,7 +128,7 @@ def build_user_prompt(question: str, facts: List[str], history: List[str]) -> st
 
 
 def _anthropic(messages: List[dict], system: str, max_tokens: int) -> str:
-    key = os.environ.get("ANTHROPIC_API_KEY")
+    key = _env("ANTHROPIC_API_KEY")
     if not key:
         raise LLMError("ANTHROPIC_API_KEY is not set")
     r = requests.post(
@@ -136,7 +147,7 @@ def _anthropic(messages: List[dict], system: str, max_tokens: int) -> str:
         timeout=TIMEOUT * 2,
     )
     if r.status_code == 401:
-        raise LLMError("API key rejected (401). Check ANTHROPIC_API_KEY.")
+        raise LLMError("API key rejected (401). Check ANTHROPIC_API_KEY is copied in full and still active.")
     if r.status_code == 429:
         raise LLMError("rate limited (429). Try again in a moment.")
     if not r.ok:
@@ -183,7 +194,7 @@ def _openai_compat(name: str):
             timeout=TIMEOUT * 2,
         )
         if r.status_code in (401, 403):
-            raise LLMError(f"{name}: API key rejected ({r.status_code}). Check the key.")
+            raise LLMError(f"{name}: API key rejected ({r.status_code}). Check it is copied in full (no quotes or spaces) and still active in the provider's console; make a new key if unsure.")
         if r.status_code == 404:
             raise LLMError(f"{name}: model not found. Set SPEKTRA_LLM_MODEL to a current model name.")
         if r.status_code == 429:

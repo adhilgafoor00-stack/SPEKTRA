@@ -4,7 +4,11 @@ from urllib.parse import urlparse
 
 from flask import Flask, render_template, request, jsonify
 
-from core.assistant import Assistant
+from core.envfile import load_env
+
+load_env()  # read API keys from .env (git-ignored) before anything else
+
+from core.assistant import Assistant  # noqa: E402
 from core.widgets import get_widgets
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
