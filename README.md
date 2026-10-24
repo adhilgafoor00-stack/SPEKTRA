@@ -8,7 +8,8 @@ A modular, locally-run AI assistant with a sci-fi browser UI (Flask + Three.js).
 
 | Area | What it does |
 |---|---|
-| **LLM brain** | `ask` uses Claude (API) or a local model (Ollama). Facts you `teach` are injected as context, so answers reflect your knowledge. Falls back to facts, then Wikipedia, when no LLM is available. |
+| **Chat** | Just type. Anything that isn't a command becomes a multi-turn conversation with Claude (API) or a local model (Ollama). `reset` starts a fresh conversation. |
+| **Grounded answers** | Facts you `teach` are injected as context for chat and `ask`. `ask` falls back to facts, then Wikipedia, when no LLM is available. |
 | **Self-learning memory** | `teach <topic>: <fact>`, `facts`, notes, and a capped interaction log, all in JSON under `data/`. |
 | **Hardware bridge** | `hw read temp`, `hw led on`. Simulation mode by default; real boards over USB serial. Live HUD widget. |
 | **Dev helpers** | `genproj <python-cli\|flask-app\|tkinter-app> <dir>`, `gen file`, `code`, `calc`, `search`. |
@@ -31,6 +32,8 @@ Docker: `docker compose up --build` (reachable only from your machine).
 
 ```
 help                              list commands
+(any plain sentence)              chat with the model, remembers the conversation
+reset                             start a new conversation
 ask what is recursion             LLM + your taught facts
 llm                               show active LLM backend
 teach python: readable language   store a fact
@@ -52,14 +55,16 @@ SPEKTRA picks a backend automatically (`SPEKTRA_LLM=auto`):
 ```bash
 # Option A: Claude API
 export ANTHROPIC_API_KEY=sk-ant-...
-export SPEKTRA_LLM_MODEL=claude-haiku-5-5     # optional override
+export SPEKTRA_LLM_MODEL=claude-haiku-5-5     # optional: cheaper/faster (default is claude-sonnet-5-5)
 
 # Option B: fully local/offline
 ollama pull llama3.2 && ollama serve
 export SPEKTRA_LLM=ollama
 ```
 
-Run `llm` in the console to see what is active. Set `SPEKTRA_LLM=none` to disable.
+Get a key at console.anthropic.com (API usage is billed separately from a Claude subscription). Run `llm` in the console to see what is active.
+
+The chat personality lives in `CHAT_SYSTEM_PROMPT` in `core/llm.py`; edit it to change how SPEKTRA talks. Set `SPEKTRA_LLM=none` to disable.
 
 ## Using real hardware
 

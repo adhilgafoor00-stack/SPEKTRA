@@ -11,6 +11,7 @@ import importlib, pkgutil, os, re
 class Assistant:
     def __init__(self):
         self.memory = Memory()
+        self.history = []  # chat turns for this server session: [{"role","content"}, ...]
         self.commands: Dict[str, Callable[[str], str]] = {}
         self._register_builtin()
         self._load_skills()
@@ -26,6 +27,8 @@ class Assistant:
         self._register("summarize", self.cmd_summarize, "Summarize a long text")
         self._register("ask", self.cmd_ask, "Ask (LLM + your taught facts, falls back to Wikipedia)")
         self._register("llm", self.cmd_llm, "Show which LLM backend is active")
+        self._register("chat", self.cmd_chat, "Chat explicitly: chat <message> (plain text works too)")
+        self._register("reset", self.cmd_reset, "Forget the current chat conversation")
         self._register("teach", self.cmd_teach, "Teach a fact: teach <topic>: <fact>")
         self._register("facts", self.cmd_facts, "List learned topics")
         self._register("search", self.cmd_search, "Web search via DuckDuckGo")
@@ -95,6 +98,48 @@ class Assistant:
 
     def cmd_llm(self, _: str) -> str:
         return llm.status()
+
+    NO_ARG_COMMANDS = {"help", "quit", "facts", "notes", "llm", "reset"}
+    MAX_HISTORY = 20  # messages kept in the live conversation
+
+    NO_LLM_MESSAGE = (
+        "I can chat once a model is connected. Two options:\n"
+        "1) Claude: set ANTHROPIC_API_KEY (get one at console.anthropic.com), then restart.\n"
+        "2) Local: install Ollama, run `ollama pull llama3.2`, set SPEKTRA_LLM=ollama.\n"
+        "Until then I still do commands. Type 'help'."
+    )
+
+    def _relevant_facts(self, text: str):
+        facts = []
+        for t in top_matches(self.memory.list_topics(), text, limit=3):
+            for f in self.memory.get_facts(t)[-3:]:
+                facts.append(f"{t}: {f['fact']}")
+        return facts
+
+    def cmd_chat(self, rest: str) -> str:
+        text = rest.strip()
+        if not text:
+            return "say something! e.g. chat explain pull-up resistors"
+        if llm.pick_backend() == "none":
+            return self.NO_LLM_MESSAGE
+        messages = self.history[-(self.MAX_HISTORY - 1):] + [{"role": "user", "content": text}]
+        # the API needs the first turn to be from the user
+        while messages and messages[0]["role"] != "user":
+            messages.pop(0)
+        try:
+            reply = llm.chat(messages, facts=self._relevant_facts(text))
+        except llm.LLMError as e:
+            return f"(chat error) {e}"
+        # only remember the exchange once it succeeded, so history stays well-formed
+        self.history.extend([{"role": "user", "content": text},
+                             {"role": "assistant", "content": reply}])
+        del self.history[:-self.MAX_HISTORY]
+        self.memory.log_interaction(f"chat: {text}", reply)
+        return reply
+
+    def cmd_reset(self, _: str) -> str:
+        self.history.clear()
+        return "conversation cleared."
 
     def cmd_teach(self, rest: str) -> str:
         m = re.match(r"\s*([^:]+)\s*:\s*(.+)", rest)
@@ -210,8 +255,10 @@ class Assistant:
         cmd = parts[0].lower()
         rest = parts[1] if len(parts) > 1 else ""
         func = self.commands.get(cmd)
+        # "help me with X" is conversation, not the `help` command
+        if cmd in self.NO_ARG_COMMANDS and rest.strip():
+            func = None
         if func:
             return func(rest)
-        if "default" in self.commands:
-            return self.commands["default"](text)
-        return "unknown command. type 'help'."
+        # not a command: treat it as conversation
+        return self.cmd_chat(text)

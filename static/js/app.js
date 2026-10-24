@@ -21,10 +21,12 @@ function addLine(text, cls="ai") {
   div.textContent = text;
   elOutput.appendChild(div);
   elOutput.scrollTop = elOutput.scrollHeight;
+  return div;
 }
 
 async function send(text) {
   addLine("you> " + text, "user");
+  const thinking = addLine("...", "ai thinking");
   try {
     const r = await fetch("/api/handle", {
       method: "POST",
@@ -32,8 +34,10 @@ async function send(text) {
       body: JSON.stringify({text})
     });
     const j = await r.json();
+    thinking.remove();
     addLine(j.reply || "(no reply)");
   } catch (e) {
+    thinking.remove();
     addLine("network error: " + e);
   }
 }
@@ -46,7 +50,7 @@ elForm.addEventListener("submit", (e) => {
   send(t);
 });
 
-addLine("SPEKTRA V2 online. Type 'help' to begin.");
+addLine("SPEKTRA online. Just talk to me, or type 'help' for commands.");
 elCmd.focus();
 
 // ---- Widgets ----

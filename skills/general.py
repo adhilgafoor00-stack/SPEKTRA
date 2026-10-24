@@ -3,10 +3,6 @@ from typing import Callable
 def register(app):
     app._register("echo", lambda rest: rest, "Echo text back")
     app._register("code", codegen, "Generate tiny code snippet: code <lang> \"<intent>\"")
-    app._register("default", fallback, "Fallback handler")
-
-def fallback(text: str) -> str:
-    return f"I didn't recognize that. Try 'help'. You said: {text}"
 
 def codegen(rest: str) -> str:
     rest = rest.strip()
