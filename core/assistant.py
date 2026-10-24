@@ -1,7 +1,11 @@
 from typing import Dict, Callable
 from core.memory import Memory
 from core import tools
-from core.learn import best_match
+from core.learn import best_match, top_matches
+from core import llm
+from core.safety import (
+    MAX_WRITE_BYTES, SandboxError, resolve_in_workspace, valid_project_name,
+)
 import importlib, pkgutil, os, re
 
 class Assistant:
@@ -20,15 +24,16 @@ class Assistant:
         self._register("quit", self.cmd_quit, "Exit the assistant (server keeps running)")
         self._register("calc", self.cmd_calc, "Calculate: calc 2*(3+4)")
         self._register("summarize", self.cmd_summarize, "Summarize a long text")
-        self._register("ask", self.cmd_ask, "Ask (learned facts + Wikipedia)")
+        self._register("ask", self.cmd_ask, "Ask (LLM + your taught facts, falls back to Wikipedia)")
+        self._register("llm", self.cmd_llm, "Show which LLM backend is active")
         self._register("teach", self.cmd_teach, "Teach a fact: teach <topic>: <fact>")
         self._register("facts", self.cmd_facts, "List learned topics")
         self._register("search", self.cmd_search, "Web search via DuckDuckGo")
         self._register("save", self.cmd_save, "Save note: save note <text>")
         self._register("notes", self.cmd_notes, "List notes")
         self._register("recall", self.cmd_recall, "Show last interactions")
-        self._register("gen", self.cmd_gen, "Generate helper files: gen file <path> <content>")
-        self._register("genproj", self.cmd_genproj, "Scaffold a project: genproj <python-cli|flask-app|tkinter-app> <dir>")
+        self._register("gen", self.cmd_gen, "Create a workspace file: gen file <path> <content>")
+        self._register("genproj", self.cmd_genproj, "Scaffold a project in the workspace: genproj <python-cli|flask-app|tkinter-app> <dir>")
 
     def _load_skills(self):
         skills_pkg = "skills"
@@ -61,22 +66,35 @@ class Assistant:
     def cmd_ask(self, rest: str) -> str:
         q = rest.strip()
         if not q: return "usage: ask <question>"
-        # 1) check learned facts
-        topics = self.memory.list_topics()
-        match, score = best_match(topics, q)
-        if score > 0:
-            facts = self.memory.get_facts(match)
-            if facts:
-                merged = "; ".join(f["fact"] for f in facts[-3:])
-                ans = f"(learned) {match}: {merged}"
-                self.memory.log_interaction(f"ask: {q}", ans)
-                return ans
-        # 2) wikipedia
+        # relevant taught facts (used as context for the LLM, or as the answer offline)
+        topics = top_matches(self.memory.list_topics(), q, limit=3)
+        facts = []
+        for t in topics:
+            for f in self.memory.get_facts(t)[-3:]:
+                facts.append(f"{t}: {f['fact']}")
+        history = []
+        for it in self.memory.last(3):
+            history.append(f"user: {it['user']}")
+            history.append(f"spektra: {it['assistant']}")
+        # 1) LLM, grounded in learned facts
+        ans = llm.generate(q, facts=facts, history=history)
+        if ans:
+            self.memory.log_interaction(f"ask: {q}", ans)
+            return ans
+        # 2) learned facts only
+        if facts:
+            ans = "(learned) " + "; ".join(facts)
+            self.memory.log_interaction(f"ask: {q}", ans)
+            return ans
+        # 3) wikipedia
         ans = tools.wiki_summary(q, sentences=2)
         if "error" in ans or "not installed" in ans:
             ans = f"(base) Recap for '{q}': " + tools.summarize(q)
         self.memory.log_interaction(f"ask: {q}", ans)
         return ans
+
+    def cmd_llm(self, _: str) -> str:
+        return llm.status()
 
     def cmd_teach(self, rest: str) -> str:
         m = re.match(r"\s*([^:]+)\s*:\s*(.+)", rest)
@@ -138,36 +156,51 @@ class Assistant:
         if len(parts) < 3 or parts[0] != "file":
             return "usage: gen file <path> <content>"
         path, content = parts[1], parts[2]
+        if len(content.encode("utf-8")) > MAX_WRITE_BYTES:
+            return "gen error: content too large"
         try:
-            abspath = os.path.abspath(path)
-            with open(abspath, "w") as f:
+            abspath = resolve_in_workspace(path)
+            os.makedirs(os.path.dirname(abspath), exist_ok=True)
+            with open(abspath, "w", encoding="utf-8") as f:
                 f.write(content)
-            return f"file created: {abspath}"
+            return f"file created: {os.path.relpath(abspath, resolve_in_workspace('.'))}"
+        except SandboxError as e:
+            return f"gen error: {e}"
         except Exception as e:
             return f"gen error: {e}"
 
+    TEMPLATES = {
+        "python-cli": {
+            "main.py": "#!/usr/bin/env python3\nimport sys\n\n\ndef main(argv):\n    print('Hello CLI')\n\n\nif __name__ == '__main__':\n    main(sys.argv[1:])\n",
+        },
+        "flask-app": {
+            "app.py": "from flask import Flask\n\napp = Flask(__name__)\n\n\n@app.get('/')\ndef home():\n    return 'Hello Flask'\n\n\nif __name__ == '__main__':\n    app.run(host='127.0.0.1', port=5000)\n",
+            "requirements.txt": "flask\n",
+        },
+        "tkinter-app": {
+            "app.py": "import tkinter as tk\n\nroot = tk.Tk()\nroot.title('App')\ntk.Label(root, text='Hello').pack()\nroot.mainloop()\n",
+        },
+    }
+
     def cmd_genproj(self, rest: str) -> str:
         parts = rest.strip().split()
-        if len(parts) < 2:
+        if len(parts) != 2:
             return "usage: genproj <python-cli|flask-app|tkinter-app> <dir>"
-        template, dest = parts[0], parts[1]
+        template, dest = parts
+        files = self.TEMPLATES.get(template)
+        if files is None:
+            return "unknown template. choose: " + ", ".join(self.TEMPLATES)
+        if not valid_project_name(dest):
+            return "genproj error: use a simple folder name (letters, digits, . _ -)"
         try:
-            os.makedirs(dest, exist_ok=True)
-            if template == "python-cli":
-                with open(os.path.join(dest, "main.py"), "w") as f:
-                    f.write("#!/usr/bin/env python3\nimport sys\nif __name__ == '__main__':\n    print('Hello CLI')\n")
-                return f"python-cli scaffolded at {os.path.abspath(dest)}"
-            if template == "flask-app":
-                with open(os.path.join(dest, "app.py"), "w") as f:
-                    f.write("from flask import Flask\napp = Flask(__name__)\n@app.get('/')\ndef home(): return 'Hello Flask'\napp.run(debug=True)\n")
-                with open(os.path.join(dest, "requirements.txt"), "w") as f:
-                    f.write("flask\n")
-                return f"flask-app scaffolded at {os.path.abspath(dest)}"
-            if template == "tkinter-app":
-                with open(os.path.join(dest, "app.py"), "w") as f:
-                    f.write("import tkinter as tk\nr=tk.Tk(); r.title('App'); tk.Label(r,text='Hello').pack(); r.mainloop()\n")
-                return f"tkinter-app scaffolded at {os.path.abspath(dest)}"
-            return "unknown template"
+            root = resolve_in_workspace(dest)
+            os.makedirs(root, exist_ok=True)
+            for name, body in files.items():
+                with open(os.path.join(root, name), "w", encoding="utf-8") as f:
+                    f.write(body)
+            return f"{template} scaffolded at workspace/{dest}"
+        except SandboxError as e:
+            return f"genproj error: {e}"
         except Exception as e:
             return f"genproj error: {e}"
 

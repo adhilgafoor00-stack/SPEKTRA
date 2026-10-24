@@ -6,6 +6,7 @@ except Exception:
     psutil = None
 
 import requests
+from core import hardware
 
 def net_status(timeout=2.0) -> Dict[str, str]:
     t0 = time.time()
@@ -42,4 +43,5 @@ def get_widgets():
         "clock": int(time.time()),
         "system": sys_stats(),
         "network": net_status(),
+        "hardware": hardware.snapshot(),
     }

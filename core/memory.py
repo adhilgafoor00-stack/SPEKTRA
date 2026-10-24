@@ -43,10 +43,13 @@ class Memory:
     def list_notes(self):
         return list(self.data.get("notes", []))
 
+    MAX_LOG = 500
+
     def log_interaction(self, user: str, assistant: str):
-        self.data.setdefault("log", []).append({
-            "user": user, "assistant": assistant, "ts": time.time()
-        })
+        log = self.data.setdefault("log", [])
+        log.append({"user": user, "assistant": assistant, "ts": time.time()})
+        if len(log) > self.MAX_LOG:
+            del log[:len(log) - self.MAX_LOG]
         self._save()
 
     def last(self, n: int = 5):

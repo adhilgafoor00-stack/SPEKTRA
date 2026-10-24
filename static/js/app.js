@@ -11,6 +11,9 @@ const elPROCS = document.getElementById("procs");
 const elON = document.getElementById("online");
 const elLAT = document.getElementById("latency");
 const elIP = document.getElementById("ip");
+const elHWM = document.getElementById("hw-mode");
+const elHWT = document.getElementById("hw-temp");
+const elHWL = document.getElementById("hw-led");
 
 function addLine(text, cls="ai") {
   const div = document.createElement("div");
@@ -67,6 +70,11 @@ async function pollWidgets() {
       elON.textContent = d.network.online ? "yes" : "no";
       elLAT.textContent = (d.network.latency_ms ?? "n/a") + " ms";
       elIP.textContent = d.network.ip;
+      if (d.hardware) {
+        elHWM.textContent = d.hardware.mode;
+        elHWT.textContent = d.hardware.temp;
+        elHWL.textContent = d.hardware.led;
+      }
     }
   } catch (e) {
     // ignore
